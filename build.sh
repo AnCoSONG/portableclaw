@@ -235,6 +235,23 @@ cp "${SCRIPT_DIR}/README.txt" "${PACKAGE_DIR}/README.txt" 2>/dev/null || true
 success "Scripts copied"
 
 # ---------------------------------------------------------------------------
+# 6.5. Code-sign macOS binaries (requires APPLE_SIGNING_IDENTITY env var)
+# ---------------------------------------------------------------------------
+if [[ "$NODE_OS" == "darwin" && -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+    info "Code-signing macOS binaries with: ${APPLE_SIGNING_IDENTITY}"
+    SIGN_COUNT=0
+    while IFS= read -r -d '' binary; do
+        codesign --force --options runtime --timestamp \
+            --sign "$APPLE_SIGNING_IDENTITY" "$binary"
+        ((SIGN_COUNT++))
+    done < <(find "$PACKAGE_DIR" -type f \( -name "*.node" -o -name "*.dylib" -o -name "*.so" \) -print0)
+    codesign --force --options runtime --timestamp \
+        --sign "$APPLE_SIGNING_IDENTITY" "${PACKAGE_DIR}/runtime/node"
+    ((SIGN_COUNT++))
+    success "Signed ${SIGN_COUNT} Mach-O binaries"
+fi
+
+# ---------------------------------------------------------------------------
 # 7. Package
 # ---------------------------------------------------------------------------
 info "Packaging..."
