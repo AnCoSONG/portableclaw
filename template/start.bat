@@ -44,7 +44,7 @@ if not exist "%OPENCLAW_ENTRY%" (
 )
 
 :: First run: onboard if no config exists
-if not exist "%OPENCLAW_HOME%\openclaw.json" (
+if not exist "%OPENCLAW_HOME%\.openclaw\openclaw.json" (
     echo.
     echo  ================================================
     echo    OpenClaw - First Run Setup

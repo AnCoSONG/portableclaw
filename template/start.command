@@ -32,7 +32,7 @@ if [[ ! -f "$OPENCLAW_ENTRY" ]]; then
 fi
 
 # First run: onboard if no config exists
-if [[ ! -f "$OPENCLAW_HOME/openclaw.json" ]]; then
+if [[ ! -f "$OPENCLAW_HOME/.openclaw/openclaw.json" ]]; then
     echo ""
     echo "  ================================================"
     echo "    OpenClaw - First Run Setup"
