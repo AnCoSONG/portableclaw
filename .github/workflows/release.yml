@@ -1,0 +1,127 @@
+name: Build Portable Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      openclaw_version:
+        description: "OpenClaw version (npm dist-tag or semver)"
+        default: "latest"
+      node_version:
+        description: "Node.js version"
+        default: "22.14.0"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: ${{ inputs.node_version || '22.14.0' }}
+  OPENCLAW_VERSION: ${{ inputs.openclaw_version || 'latest' }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin-arm64
+          - os: macos-13
+            target: darwin-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: windows-latest
+            target: win-x64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build portable package
+        shell: bash
+        run: bash build.sh ${{ matrix.target }}
+        env:
+          NODE_VERSION: ${{ env.NODE_VERSION }}
+          OPENCLAW_VERSION: ${{ env.OPENCLAW_VERSION }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portableclaw-${{ matrix.target }}
+          path: dist/portableclaw-${{ matrix.target }}.*
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$(date +%Y%m%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec sha256sum {} \; | sort > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "PortableClaw ${{ steps.tag.outputs.tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+            SHA256SUMS.txt
+          body: |
+            ## PortableClaw ${{ steps.tag.outputs.tag }}
+
+            Pre-built portable OpenClaw packages. Download, extract, double-click `start` to run.
+
+            **Node.js**: v${{ env.NODE_VERSION }} | **OpenClaw**: ${{ env.OPENCLAW_VERSION }}
+
+            ### Downloads
+
+            | Platform | Architecture | File |
+            |----------|-------------|------|
+            | macOS | Apple Silicon (M1/M2/M3) | `portableclaw-darwin-arm64.tar.gz` |
+            | macOS | Intel | `portableclaw-darwin-x64.tar.gz` |
+            | Linux | x86_64 | `portableclaw-linux-x64.tar.gz` |
+            | Linux | ARM64 | `portableclaw-linux-arm64.tar.gz` |
+            | Windows | x86_64 | `portableclaw-win-x64.zip` |
+
+            ### Quick Start
+
+            **macOS / Linux**: Extract, then double-click `start.command` (macOS) or run `./start.sh` (Linux).
+
+            **Windows**: Extract the zip, then double-click `start.bat`.
+
+            ### Verify (optional)
+
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
