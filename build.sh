@@ -240,14 +240,13 @@ success "Scripts copied"
 if [[ "$NODE_OS" == "darwin" && -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
     info "Code-signing macOS binaries with: ${APPLE_SIGNING_IDENTITY}"
     SIGN_COUNT=0
-    while IFS= read -r -d '' binary; do
-        codesign --force --options runtime --timestamp \
-            --sign "$APPLE_SIGNING_IDENTITY" "$binary"
-        ((SIGN_COUNT++))
-    done < <(find "$PACKAGE_DIR" -type f \( -name "*.node" -o -name "*.dylib" -o -name "*.so" \) -print0)
-    codesign --force --options runtime --timestamp \
-        --sign "$APPLE_SIGNING_IDENTITY" "${PACKAGE_DIR}/runtime/node"
-    ((SIGN_COUNT++))
+    while IFS= read -r -d '' candidate; do
+        if file "$candidate" | grep -q 'Mach-O'; then
+            codesign --force --options runtime --timestamp \
+                --sign "$APPLE_SIGNING_IDENTITY" "$candidate"
+            ((SIGN_COUNT++))
+        fi
+    done < <(find "$PACKAGE_DIR" -type f -print0)
     success "Signed ${SIGN_COUNT} Mach-O binaries"
 fi
 
