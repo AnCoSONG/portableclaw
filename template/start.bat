@@ -2,6 +2,9 @@
 chcp 65001 >nul 2>&1
 title OpenClaw Gateway
 
+:: Disable QuickEdit mode for this window to prevent freezing when clicked
+powershell -Command "$k=Add-Type -Name W -Namespace K -PassThru -MemberDefinition '[DllImport(\"kernel32.dll\")]public static extern IntPtr GetStdHandle(int h);[DllImport(\"kernel32.dll\")]public static extern bool GetConsoleMode(IntPtr h,out int m);[DllImport(\"kernel32.dll\")]public static extern bool SetConsoleMode(IntPtr h,int m);';$h=$k::GetStdHandle(-10);$m=0;$k::GetConsoleMode($h,[ref]$m);$k::SetConsoleMode($h,$m-band(-bnot0x0040))" >nul 2>&1
+
 :: Request administrator privileges if not already elevated
 net session >nul 2>&1
 if %errorlevel% neq 0 (
