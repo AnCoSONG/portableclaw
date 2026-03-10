@@ -95,20 +95,41 @@ jobs:
             echo "::warning::Notarization credentials not configured — skipping"
             exit 0
           fi
-          mkdir -p "$HOME/.private_keys"
-          echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode \
-            > "$HOME/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+          KEY_DIR="$HOME/.private_keys"
+          KEY_FILE="$KEY_DIR/AuthKey_${APPLE_API_KEY_ID}.p8"
+          mkdir -p "$KEY_DIR"
+          echo "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$KEY_FILE"
+
           WORK="$RUNNER_TEMP/notarize"
           mkdir -p "$WORK"
           tar -xzf dist/portableclaw-${{ matrix.target }}.tar.gz -C "$WORK"
           ditto -c -k --keepParent \
             "$WORK/portableclaw-${{ matrix.target }}" "$WORK/submit.zip"
-          xcrun notarytool submit "$WORK/submit.zip" \
-            --key "$HOME/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --wait --timeout 30m
-          rm -rf "$WORK" "$HOME/.private_keys"
+
+          NOTARY_AUTH=(--key "$KEY_FILE" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+
+          OUTPUT=$(xcrun notarytool submit "$WORK/submit.zip" \
+            "${NOTARY_AUTH[@]}" --wait --timeout 30m 2>&1) || true
+          echo "$OUTPUT"
+
+          SUBMISSION_ID=$(echo "$OUTPUT" | grep -m1 '^\s*id:' | awk '{print $2}')
+
+          if echo "$OUTPUT" | grep -q 'status: Accepted'; then
+            echo "Notarization succeeded"
+          else
+            echo "::error::Notarization failed — fetching detailed log..."
+            if [[ -n "$SUBMISSION_ID" ]]; then
+              xcrun notarytool log "$SUBMISSION_ID" "${NOTARY_AUTH[@]}" \
+                "$WORK/notarization-log.json" 2>&1 || true
+              echo "--- Notarization Log ---"
+              cat "$WORK/notarization-log.json" 2>/dev/null || echo "(log unavailable)"
+              echo "--- End Log ---"
+            fi
+            rm -rf "$WORK" "$KEY_DIR"
+            exit 1
+          fi
+
+          rm -rf "$WORK" "$KEY_DIR"
 
       - name: Clean up Apple keychain
         if: always() && env.KEYCHAIN_PATH
