@@ -163,8 +163,16 @@ export PATH="${RUNTIME_DIR}:${PATH}"
 
 success "OpenClaw installed"
 
-# Record version
-INSTALLED_VERSION=$("$NODE_BIN" -e "console.log(require('${PACKAGE_DIR}/app/node_modules/openclaw/package.json').version)" 2>/dev/null || echo "$OPENCLAW_VERSION")
+# Record version (use host node for cross-platform builds where $NODE_BIN may not be executable)
+OPENCLAW_PKG_JSON="${PACKAGE_DIR}/app/node_modules/openclaw/package.json"
+if [[ -f "$OPENCLAW_PKG_JSON" ]]; then
+    INSTALLED_VERSION=$("$NODE_BIN" -e "console.log(require('${OPENCLAW_PKG_JSON}').version)" 2>/dev/null \
+        || node -e "console.log(require('${OPENCLAW_PKG_JSON}').version)" 2>/dev/null \
+        || grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$OPENCLAW_PKG_JSON" | head -1 | grep -o '"[^"]*"$' | tr -d '"' \
+        || echo "$OPENCLAW_VERSION")
+else
+    INSTALLED_VERSION="$OPENCLAW_VERSION"
+fi
 echo "$INSTALLED_VERSION" > "${PACKAGE_DIR}/VERSION"
 info "Installed version: ${INSTALLED_VERSION}"
 
@@ -235,7 +243,24 @@ mkdir -p "${SCRIPT_DIR}/${DIST_DIR}"
 
 if [[ "$IS_WIN" == true ]]; then
     ARCHIVE="${PACKAGE_NAME}.zip"
-    (cd "$WORK_DIR" && zip -qr "${SCRIPT_DIR}/${DIST_DIR}/${ARCHIVE}" "$PACKAGE_NAME")
+    if command -v zip &>/dev/null; then
+        (cd "$WORK_DIR" && zip -qr "${SCRIPT_DIR}/${DIST_DIR}/${ARCHIVE}" "$PACKAGE_NAME")
+    elif command -v 7z &>/dev/null; then
+        (cd "$WORK_DIR" && 7z a -tzip -mx=5 -bso0 "${SCRIPT_DIR}/${DIST_DIR}/${ARCHIVE}" "$PACKAGE_NAME")
+    elif command -v python3 &>/dev/null; then
+        python3 -c "
+import zipfile, os, sys
+src = os.path.join('${WORK_DIR}', '${PACKAGE_NAME}')
+dst = os.path.join('${SCRIPT_DIR}', '${DIST_DIR}', '${ARCHIVE}')
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for root, dirs, files in os.walk(src):
+        for f in files:
+            fp = os.path.join(root, f)
+            zf.write(fp, os.path.relpath(fp, '${WORK_DIR}'))
+"
+    else
+        error "No zip tool available (tried: zip, 7z, python3)"
+    fi
 else
     ARCHIVE="${PACKAGE_NAME}.tar.gz"
     tar -czf "${SCRIPT_DIR}/${DIST_DIR}/${ARCHIVE}" -C "$WORK_DIR" "$PACKAGE_NAME"
