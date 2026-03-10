@@ -8,6 +8,8 @@ NODE="$ROOT/runtime/node"
 OPENCLAW_ENTRY="$ROOT/app/node_modules/openclaw/openclaw.mjs"
 export NODE_PATH="$ROOT/app/node_modules"
 export PATH="$ROOT/runtime:$ROOT/bin:$PATH"
+export OPENCLAW_HOME="$ROOT/data"
+mkdir -p "$OPENCLAW_HOME"
 
 if [[ ! -x "$NODE" ]]; then
     echo ""
@@ -24,7 +26,7 @@ if [[ ! -f "$OPENCLAW_ENTRY" ]]; then
 fi
 
 # First run: onboard if no config exists
-if [[ ! -f "$HOME/.openclaw/openclaw.json" ]]; then
+if [[ ! -f "$OPENCLAW_HOME/openclaw.json" ]]; then
     echo ""
     echo "  ================================================"
     echo "    OpenClaw - First Run Setup"

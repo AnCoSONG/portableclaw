@@ -8,6 +8,7 @@ if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
 set "NODE=%ROOT%\runtime\node.exe"
 set "NPM_CLI=%ROOT%\runtime\node_modules\npm\bin\npm-cli.js"
 set "PATH=%ROOT%\runtime;%PATH%"
+set "OPENCLAW_HOME=%ROOT%\data"
 
 if not exist "%NODE%" (
     echo.

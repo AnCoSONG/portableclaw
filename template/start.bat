@@ -2,6 +2,16 @@
 chcp 65001 >nul 2>&1
 title OpenClaw Gateway
 
+:: Request administrator privileges if not already elevated
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    powershell -Command "Start-Process -FilePath '%~f0' -Verb RunAs -ArgumentList '%~dp0'"
+    exit /b
+)
+
+:: When launched via RunAs the working directory changes, so restore it
+cd /d "%~dp0"
+
 set "ROOT=%~dp0"
 :: Remove trailing backslash for cleaner paths
 if "%ROOT:~-1%"=="\" set "ROOT=%ROOT:~0,-1%"
@@ -10,6 +20,8 @@ set "NODE=%ROOT%\runtime\node.exe"
 set "OPENCLAW_ENTRY=%ROOT%\app\node_modules\openclaw\openclaw.mjs"
 set "NODE_PATH=%ROOT%\app\node_modules"
 set "PATH=%ROOT%\runtime;%ROOT%\bin;%PATH%"
+set "OPENCLAW_HOME=%ROOT%\data"
+if not exist "%OPENCLAW_HOME%" mkdir "%OPENCLAW_HOME%"
 
 :: Verify runtime exists
 if not exist "%NODE%" (
@@ -32,7 +44,7 @@ if not exist "%OPENCLAW_ENTRY%" (
 )
 
 :: First run: onboard if no config exists
-if not exist "%USERPROFILE%\.openclaw\openclaw.json" (
+if not exist "%OPENCLAW_HOME%\openclaw.json" (
     echo.
     echo  ================================================
     echo    OpenClaw - First Run Setup

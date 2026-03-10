@@ -2,4 +2,5 @@
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PATH="$ROOT/runtime:$PATH"
 export NODE_PATH="$ROOT/app/node_modules"
+export OPENCLAW_HOME="$ROOT/data"
 exec "$ROOT/runtime/node" "$ROOT/app/node_modules/openclaw/openclaw.mjs" "$@"

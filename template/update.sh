@@ -6,6 +6,7 @@ ROOT="$(pwd)"
 
 NODE="$ROOT/runtime/node"
 export PATH="$ROOT/runtime:$PATH"
+export OPENCLAW_HOME="$ROOT/data"
 
 if [[ ! -x "$NODE" ]]; then
     echo "[ERROR] Node.js runtime not found. Package may be corrupted."
