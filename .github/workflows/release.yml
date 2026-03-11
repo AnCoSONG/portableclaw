@@ -108,44 +108,17 @@ jobs:
 
           NOTARY_AUTH=(--key "$KEY_FILE" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
 
-          # Submit without --wait first, then poll manually for better control
           SUBMIT_OUTPUT=$(xcrun notarytool submit "$WORK/submit.zip" \
-            "${NOTARY_AUTH[@]}" 2>&1) || true
+            "${NOTARY_AUTH[@]}" --wait 2>&1) || true
           echo "$SUBMIT_OUTPUT"
 
+          STATUS=$(echo "$SUBMIT_OUTPUT" | grep -m1 'status:' | awk '{print $2}')
           SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep -m1 '^\s*id:' | awk '{print $2}')
-          if [[ -z "$SUBMISSION_ID" ]]; then
-            echo "::error::Failed to submit for notarization"
-            rm -rf "$WORK" "$KEY_DIR"
-            exit 1
-          fi
-          echo "Submission ID: $SUBMISSION_ID"
-
-          # Poll for up to 60 minutes with increasing intervals
-          MAX_WAIT=3600
-          ELAPSED=0
-          INTERVAL=30
-          STATUS=""
-          while (( ELAPSED < MAX_WAIT )); do
-            sleep "$INTERVAL"
-            ELAPSED=$(( ELAPSED + INTERVAL ))
-            INTERVAL=$(( INTERVAL < 120 ? INTERVAL + 15 : 120 ))
-
-            POLL=$(xcrun notarytool info "$SUBMISSION_ID" "${NOTARY_AUTH[@]}" 2>&1) || true
-            STATUS=$(echo "$POLL" | grep -m1 'status:' | awk '{print $2}')
-            echo "[${ELAPSED}s] Status: ${STATUS:-unknown}"
-
-            if [[ "$STATUS" == "Accepted" || "$STATUS" == "Invalid" || "$STATUS" == "Rejected" ]]; then
-              break
-            fi
-          done
 
           if [[ "$STATUS" == "Accepted" ]]; then
             echo "Notarization succeeded"
           else
-            echo "::error::Notarization failed (status: ${STATUS:-timeout})"
-            # Wait briefly for log availability
-            sleep 10
+            echo "::error::Notarization failed (status: ${STATUS:-unknown})"
             if [[ -n "$SUBMISSION_ID" ]]; then
               xcrun notarytool log "$SUBMISSION_ID" "${NOTARY_AUTH[@]}" \
                 "$WORK/notarization-log.json" 2>&1 || true
